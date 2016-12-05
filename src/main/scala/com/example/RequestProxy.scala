@@ -31,6 +31,9 @@ class RequestProxy(statsActor: ActorRef) extends Actor with ActorLogging {
           log.info("End of session detected for session id: {}", sessionId)
           userSessionActors -= sessionId
         }
+      if (userSessionActors.isEmpty) {
+        statsActor ! EOS
+      }
 
     case EOS =>
       userSessionActors.values.foreach { _ ! EOS }
