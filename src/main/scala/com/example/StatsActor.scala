@@ -1,39 +1,48 @@
 package com.example
 
 import akka.actor.Actor.Receive
-import akka.actor.{Actor, Props}
+import akka.actor.{Actor, ActorLogging, Props}
 
-class StatsActor extends Actor {
+import scala.concurrent.duration._
+
+class StatsActor extends Actor with ActorLogging {
 
   var sessionStats = Seq.empty[SessionStats]
 
   override def receive: Receive = {
     case stats: SessionStats =>
       sessionStats = stats +: sessionStats
-
     case EOS =>
-      summarize()
+      log.info(
+        s"""
+           |STATS :
+           |Top 2 Landing pages : {}
+           |Top Sink page : {}
+        """.stripMargin,
+        topLandingPages(2), topSinkPages(1))
   }
 
-  def summarize() = {
-
-    print(avgNumOfReqPerBrowserPerMinute)
-
+  private def topLandingPages(n: Int) = {
+    sessionStats
+      .flatMap(_.requestsHistory.headOption.map(_.url))
+      .groupBy(identity)
+      .mapValues(_.size)
+      .toSeq.sortBy(-_._2).take(n).toMap
   }
 
-  def avgNumOfReqPerBrowserPerMinute: Map[String, Long] = {
-    val allRequests: Seq[Request] = sessionStats.map(_.requestsHistory).flatten
-    val browserToRequestTime: Map[String, Seq[Long]] = allRequests
-      .map(request => (request.browser, request.timestamp))
-      .groupBy(_._1)
-      .mapValues(all => all.map(_._2))
-
-    val browserToCountPerMin: Map[String, Long] = browserToRequestTime.mapValues(times => times.size / Math.max(1, ((times.max - times.min) / 1000 / 60)))
-    browserToCountPerMin
+  private def topSinkPages(n: Int) = {
+    sessionStats
+      .flatMap(_.requestsHistory.lastOption.map(_.url))
+      .groupBy(identity)
+      .mapValues(_.size)
+      .toSeq.sortBy(-_._2).take(n).toMap
   }
 
+  
 
 }
+
+case object PrintStats
 
 object StatsActor {
 

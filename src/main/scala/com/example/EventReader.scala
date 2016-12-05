@@ -40,7 +40,7 @@ class EventReader(requestProxy: ActorRef) extends Actor with ActorLogging {
       context.system.scheduler.scheduleOnce(finalDelay milliseconds) {
         log.info("Done with processing message : sending Poison Pills")
         requestProxy ! EOS
-        self ! PoisonPill
+        context.stop(self)
       }
   }
 

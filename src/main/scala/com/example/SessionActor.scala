@@ -1,7 +1,6 @@
 package com.example
 
 import akka.actor.{Actor, ActorLogging, ActorRef, Props, ReceiveTimeout}
-import akka.actor.Actor.Receive
 
 import scala.concurrent.duration._
 

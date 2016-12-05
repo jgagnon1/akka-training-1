@@ -10,7 +10,9 @@ class RequestProxy(statsActor: ActorRef) extends Actor with ActorLogging {
 
   var userSessionActors = Map.empty[Long, ActorRef]
 
-  override def receive: Receive = {
+  override def receive: Receive = handleMessages
+
+  def handleMessages: Receive = {
     case r@Request(sessionId, timestamp, _, _, _) =>
       val userSessionActor = userSessionActors.getOrElse(sessionId, {
         log.info("New session detected with session id : {}", sessionId)
@@ -24,19 +26,31 @@ class RequestProxy(statsActor: ActorRef) extends Actor with ActorLogging {
       userSessionActor ! r
 
     case Terminated(terminatedActor) =>
-      // FIXME : Optimize find with BiMap
-      userSessionActors
-        .find { case ((_, ref)) => ref == terminatedActor }
-        .foreach { case (sessionId, _) =>
-          log.info("End of session detected for session id: {}", sessionId)
-          userSessionActors -= sessionId
-        }
-      if (userSessionActors.isEmpty) {
-        statsActor ! EOS
-      }
+      removeSessionActors(terminatedActor)
 
     case EOS =>
       userSessionActors.values.foreach { _ ! EOS }
+      context.become(waitForTermination)
+  }
+
+  def waitForTermination: Receive = {
+    case Terminated(terminatedActor) =>
+      removeSessionActors(terminatedActor)
+
+      if(userSessionActors.isEmpty) {
+        statsActor ! EOS
+        context.stop(self)
+      }
+  }
+
+  private def removeSessionActors(terminatedActor: ActorRef): Unit = {
+    // FIXME : Optimize find with BiMap
+    userSessionActors
+      .find { case ((_, ref)) => ref == terminatedActor }
+      .foreach { case (sessionId, _) =>
+        log.info("End of session detected for session id: {}", sessionId)
+        userSessionActors -= sessionId
+      }
   }
 
 }
