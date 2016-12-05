@@ -23,13 +23,13 @@ class RequestProxy(statsActor: ActorRef) extends Actor with ActorLogging {
 
       context.watch(userSessionActor)
 
-      userSessionActor ! r
+      userSessionActor forward r
 
     case Terminated(terminatedActor) =>
       removeSessionActors(terminatedActor)
 
     case EOS =>
-      userSessionActors.values.foreach { _ ! EOS }
+      userSessionActors.values.foreach { _ forward EOS }
       context.become(waitForTermination)
   }
 
@@ -38,7 +38,7 @@ class RequestProxy(statsActor: ActorRef) extends Actor with ActorLogging {
       removeSessionActors(terminatedActor)
 
       if(userSessionActors.isEmpty) {
-        statsActor ! EOS
+        statsActor forward EOS
         context.stop(self)
       }
   }

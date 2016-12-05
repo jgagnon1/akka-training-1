@@ -1,9 +1,6 @@
 package com.example
 
-import akka.actor.Actor.Receive
 import akka.actor.{Actor, ActorLogging, Props}
-
-import scala.concurrent.duration._
 
 class StatsActor extends Actor with ActorLogging {
 
@@ -15,30 +12,26 @@ class StatsActor extends Actor with ActorLogging {
     case EOS =>
       log.info(
         s"""
-           |STATS :
+           |== STATS ==
            |Top 2 Landing pages : {}
-           |Top Sink page : {}
+           |Top 1 Sink page : {}
+           |Top 3 Browser : {}
+           |Top 3 Referrer : {}
         """.stripMargin,
-        topLandingPages(2), topSinkPages(1))
+        sessionTopByAggr(2, (s: SessionStats) => s.requestsHistory.headOption.map(_.url).toSeq),
+        sessionTopByAggr(1, (s: SessionStats) => s.requestsHistory.lastOption.map(_.url).toSeq),
+        sessionTopByAggr(3, (s: SessionStats) => s.requestsHistory.map(_.browser)),
+        sessionTopByAggr(3, (s: SessionStats) => s.requestsHistory.map(_.referrer))
+      )
   }
 
-  private def topLandingPages(n: Int) = {
+  private def sessionTopByAggr[T](n: Int, aggregateFn: SessionStats => Seq[T]) = {
     sessionStats
-      .flatMap(_.requestsHistory.headOption.map(_.url))
+      .flatMap(aggregateFn(_))
       .groupBy(identity)
       .mapValues(_.size)
       .toSeq.sortBy(-_._2).take(n).toMap
   }
-
-  private def topSinkPages(n: Int) = {
-    sessionStats
-      .flatMap(_.requestsHistory.lastOption.map(_.url))
-      .groupBy(identity)
-      .mapValues(_.size)
-      .toSeq.sortBy(-_._2).take(n).toMap
-  }
-
-  
 
 }
 

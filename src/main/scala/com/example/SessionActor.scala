@@ -22,7 +22,7 @@ class SessionActor(statsActor: ActorRef) extends Actor with ActorLogging {
       context.stop(self)
   }
 
-  private def sendStats() = requestsHistory match {
+  private def sendStats() = requestsHistory.reverse match {
     case xs@h +: _ => statsActor ! SessionStats(h.sessionId, xs)
     case _ => // Empty history noop
   }
