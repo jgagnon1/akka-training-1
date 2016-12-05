@@ -1,7 +1,7 @@
 package com.example
 
 
-import akka.actor.{Actor, ActorRef, ActorSystem, Props}
+import akka.actor.{Actor, ActorRef, ActorSystem, PoisonPill, Props}
 import akka.testkit.{ImplicitSender, TestActorRef, TestActors, TestKit, TestProbe}
 import org.scalatest.WordSpecLike
 import org.scalatest.Matchers
@@ -25,16 +25,8 @@ class EventReaderActorSpec(_system: ActorSystem) extends TestKit(_system) with I
       eventReaderActorRef ! Read("resources/events-2.txt")
       requestProxyTestProbe.expectMsg(Request(795253081L, 1480534410848L, "/", "google", "firefox"))
       requestProxyTestProbe.expectMsg(Request(795253081L, 1480534410955L, "/", "google", "firefox"))
-      requestProxyTestProbe.expectMsg(Die)
+      requestProxyTestProbe.expectMsg(PoisonPill)
       eventReaderActorRef should be('Terminated)
-    }
-  }
-
-  "An RequestProxy actor" must {
-    "stop itself when receiving Die message" in {
-      val requestProxyActorRef = system.actorOf(RequestProxy.props())
-      requestProxyActorRef ! Die
-      requestProxyActorRef should be('Terminated)
     }
   }
 

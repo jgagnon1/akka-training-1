@@ -1,23 +1,46 @@
 package com.example
 
-import akka.actor.{Actor, ActorRef, Props}
+import akka.actor.{Actor, ActorRef, PoisonPill, Props}
 
 import scala.io.Source
 import scala.util.matching.Regex
+import scala.concurrent.duration._
 
 /**
   * Created by jerome on 2016-12-05.
   */
 class EventReader(requestProxy: ActorRef) extends Actor {
 
+  implicit val ec = context.dispatcher
+
   override def receive: Receive = {
     case Read(path) =>
-      Source.fromFile(path).getLines()
+      val requests = Source.fromFile(path).getLines()
         .map(EventReader.parseRequest)
-        .foreach(requestProxy ! _)
 
-      requestProxy ! Die
-      context.stop(self)
+      val (firstTs, lastTs) = requests.foldLeft[(Option[Long], Option[Long])]((None, None)) { case (firstTimestamp, request) =>
+        firstTimestamp match {
+          case (None, _) =>
+            requestProxy ! request
+            (Some(request.timestamp), Some(request.timestamp))
+          case (Some(first), _) =>
+            val delay = request.timestamp - first
+            context.system.scheduler.scheduleOnce(delay milliseconds) {
+              requestProxy ! request
+            }
+            (Some(first), Some(request.timestamp))
+        }
+      }
+
+      val finalDelay: Long = (for {
+        f <- firstTs
+        l <- lastTs
+      } yield l - f).getOrElse(0)
+
+      context.system.scheduler.scheduleOnce(finalDelay milliseconds) {
+        requestProxy ! PoisonPill
+        self ! PoisonPill
+      }
   }
 
 }
