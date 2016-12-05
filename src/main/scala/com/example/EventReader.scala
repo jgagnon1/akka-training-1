@@ -1,6 +1,6 @@
 package com.example
 
-import akka.actor.{Actor, ActorRef, PoisonPill, Props}
+import akka.actor.{Actor, ActorLogging, ActorRef, PoisonPill, Props}
 
 import scala.io.Source
 import scala.util.matching.Regex
@@ -9,7 +9,7 @@ import scala.concurrent.duration._
 /**
   * Created by jerome on 2016-12-05.
   */
-class EventReader(requestProxy: ActorRef) extends Actor {
+class EventReader(requestProxy: ActorRef) extends Actor with ActorLogging {
 
   implicit val ec = context.dispatcher
 
@@ -38,7 +38,8 @@ class EventReader(requestProxy: ActorRef) extends Actor {
       } yield l - f).getOrElse(0)
 
       context.system.scheduler.scheduleOnce(finalDelay milliseconds) {
-        requestProxy ! PoisonPill
+        log.info("Done with processing message : sending Poison Pills")
+        requestProxy ! EOS
         self ! PoisonPill
       }
   }
@@ -62,3 +63,5 @@ object EventReader {
 final case class Request(sessionId: Long, timestamp: Long, url: String, referrer: String, browser: String)
 
 final case class Read(path: String)
+
+case object EOS
