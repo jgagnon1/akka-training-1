@@ -10,16 +10,18 @@ import scala.util.matching.Regex
   */
 class EventReader extends Actor {
 
-  val RequestRegex: Regex = "Request\\((.*)\\)".r
+
+
+  val requestProxy = context.actorOf(RequestProxy.props())
 
   override def receive: Receive = {
     case Read(path) =>
-      val lines = Source.fromFile(path).getLines()
-      val requests = lines.map { line =>
-        val RequestRegex(body) = line
-        val Array(sessionId, ts, url, ref, browser) = body.split(",")
-        Request(sessionId.toLong, ts.toLong, url, ref, browser)
-      }
+      Source.fromFile(path).getLines()
+        .map(EventReader.parseRequest)
+        .foreach(requestProxy ! _)
+
+      requestProxy ! Die
+      context.stop(self)
   }
 
 }
@@ -27,6 +29,14 @@ class EventReader extends Actor {
 object EventReader {
 
   def props(): Props = Props[EventReader]
+
+  val RequestRegex: Regex = "Request\\((.*)\\)".r
+
+  def parseRequest(line: String): Request = {
+    val RequestRegex(body) = line
+    val Array(sessionId, ts, url, ref, browser) = body.split(",")
+    Request(sessionId.toLong, ts.toLong, url, ref, browser)
+  }
 
 }
 
