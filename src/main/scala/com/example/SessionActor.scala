@@ -5,7 +5,7 @@ import akka.actor.Actor.Receive
 
 import scala.concurrent.duration._
 
-class SessionActor extends Actor {
+class SessionActor(statsActor: ActorRef) extends Actor {
 
   var requestsHistory = Seq.empty[Request]
 
@@ -14,9 +14,10 @@ class SessionActor extends Actor {
       requestsHistory = r +: requestsHistory
       context.setReceiveTimeout(5 seconds)
     case ReceiveTimeout =>
-      // TODO : send stats to StatsActors
-
-
+      requestsHistory match {
+        case xs @ h +: _ => statsActor ! SessionStats(h.sessionId, xs)
+        case _ => // Empty history noop
+      }
       context.stop(self)
   }
 
@@ -27,3 +28,5 @@ object SessionActor {
   def props(): Props = Props(classOf[SessionActor])
 
 }
+
+final case class SessionStats(sessionId: Long, requestsHistory: Seq[Request])
