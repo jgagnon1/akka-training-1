@@ -1,6 +1,6 @@
 package com.example
 
-import akka.actor.{Actor, Props}
+import akka.actor.{Actor, ActorRef, Props}
 
 import scala.io.Source
 import scala.util.matching.Regex
@@ -8,11 +8,7 @@ import scala.util.matching.Regex
 /**
   * Created by jerome on 2016-12-05.
   */
-class EventReader extends Actor {
-
-
-
-  val requestProxy = context.actorOf(RequestProxy.props())
+class EventReader(requestProxy: ActorRef) extends Actor {
 
   override def receive: Receive = {
     case Read(path) =>
@@ -28,7 +24,7 @@ class EventReader extends Actor {
 
 object EventReader {
 
-  def props(): Props = Props[EventReader]
+  def props(requestProxy: ActorRef): Props = Props(classOf[EventReader], requestProxy)
 
   val RequestRegex: Regex = "Request\\((.*)\\)".r
 
