@@ -4,16 +4,27 @@ import akka.actor.{Actor, ActorLogging, ActorRef, Props, ReceiveTimeout}
 
 import scala.concurrent.duration._
 
-class SessionActor(statsActor: ActorRef) extends Actor with ActorLogging {
+class SessionActor(sessionId: Long, statsActor: ActorRef) extends Actor with ActorLogging {
 
   var requestsHistory = Seq.empty[Request]
 
-  context.setReceiveTimeout(5 seconds)
+  override def receive: Receive = receiveStateHelp(onHelp = false)
 
-  override def receive: Receive = {
-    case r: Request =>
+  def receiveStateHelp(onHelp: Boolean): Receive = {
+    case r@Request(_, _, path, _, _) =>
       requestsHistory = r +: requestsHistory
 
+      // Handle Help chat session
+      path match {
+        case "/help" if !onHelp =>
+          context.become(receiveStateHelp(onHelp = true))
+          context.setReceiveTimeout(2 seconds)
+        case _ =>
+          resetState()
+      }
+    case ReceiveTimeout if onHelp =>
+      val chatActor = context.actorOf(ChatActor.props(sessionId))
+      resetState()
     case ReceiveTimeout =>
       //log.debug("Receive timeout : End of session -> sending stats")
       sendStats()
@@ -24,16 +35,19 @@ class SessionActor(statsActor: ActorRef) extends Actor with ActorLogging {
       context.stop(self)
   }
 
-  private def sendStats() = requestsHistory.reverse match {
-    case xs@h +: _ => statsActor ! SessionStats(h.sessionId, xs)
-    case _ => // Empty history noop
+  private def sendStats() =
+    statsActor ! SessionStats(sessionId, requestsHistory.reverse)
+
+  private def resetState() = {
+    context.become(receiveStateHelp(onHelp = false))
+    context.setReceiveTimeout(5 seconds)
   }
 
 }
 
 object SessionActor {
 
-  def props(statsActor: ActorRef): Props = Props(classOf[SessionActor], statsActor)
+  def props(sessionId: Long, statsActor: ActorRef): Props = Props(classOf[SessionActor], sessionId, statsActor)
 
 }
 
