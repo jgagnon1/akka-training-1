@@ -30,7 +30,7 @@ class SessionActor(sessionId: Long, statsActor: ActorRef) extends Actor with Act
       sendStats()
       context.stop(self)
     case EOS =>
-      //log.debug("EOS : End of session -> sending stats")
+      log.info("EOS : End of session -> sending stats")
       sendStats()
       context.stop(self)
   }

@@ -31,6 +31,16 @@ class SessionFilterActor(sessionId: Long, statsActor: ActorRef) extends Actor wi
         requestCountWithinThresholdTime = 0
       }
 
+    case EOS =>
+      if(requestCountWithinThresholdTime > RateLimit) {
+        log.error("Session {} exceeded rate limit and was discarded", sessionId)
+        throw new SessionRequestException
+      } else {
+        sessionActor.forward(EOS)
+      }
+      checkRequestFrequency.cancel()
+      context.stop(self)
+
     case other =>
       sessionActor.forward(other)
   }
