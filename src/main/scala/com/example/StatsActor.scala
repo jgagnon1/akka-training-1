@@ -1,6 +1,9 @@
 package com.example
 
 import akka.actor.{Actor, ActorLogging, Props}
+import org.joda.time.format.DateTimeFormat
+
+import scala.collection.immutable.ListMap
 
 class StatsActor extends Actor with ActorLogging {
 
@@ -19,6 +22,8 @@ class StatsActor extends Actor with ActorLogging {
       log.info("Top 3 Referrer : {}", sessionTopByAggr(3, (s: SessionStats) => s.requestsHistory.map(_.referrer)))
       log.info("View count for URLs : {}", globalCountByAggr((r: Request) => r.url))
       log.info("Browser Stats : {}", globalPctByAggr((r: Request) => r.browser))
+      log.info("Busiest minutes by Request Count: {}", globalCountByAggr((r: Request) =>
+        DateTimeFormat.forPattern("YYYY-MM-dd HH:mm").print(r.timestamp)))
       context.become(handleStatusRequest)
   }
 
@@ -43,10 +48,12 @@ class StatsActor extends Actor with ActorLogging {
   }
 
   private def globalCountByAggr[T](aggregateFn: Request => T) = {
-    allRequest
+    val results = allRequest
       .groupBy(aggregateFn)
       .map { case (k, v) => (k, v.size) }
-      .toSeq.sortBy(-_._2).toMap
+      .toSeq.sortBy(-_._2)
+
+    ListMap(results: _*)
   }
 
 }
