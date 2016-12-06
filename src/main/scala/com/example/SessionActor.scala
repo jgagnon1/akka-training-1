@@ -15,11 +15,11 @@ class SessionActor(statsActor: ActorRef) extends Actor with ActorLogging {
       requestsHistory = r +: requestsHistory
 
     case ReceiveTimeout =>
-      log.debug("Receive timeout : End of session -> sending stats")
+      //log.debug("Receive timeout : End of session -> sending stats")
       sendStats()
       context.stop(self)
     case EOS =>
-      log.debug("EOS : End of session -> sending stats")
+      //log.debug("EOS : End of session -> sending stats")
       sendStats()
       context.stop(self)
   }

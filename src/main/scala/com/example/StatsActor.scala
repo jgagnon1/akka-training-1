@@ -6,7 +6,9 @@ class StatsActor extends Actor with ActorLogging {
 
   var sessionStats = Seq.empty[SessionStats]
 
-  override def receive: Receive = {
+  override def receive: Receive = aggregating orElse handleStatusRequest
+
+  private def aggregating: Receive = {
     case stats: SessionStats =>
       sessionStats = stats +: sessionStats
     case EOS =>
@@ -17,6 +19,12 @@ class StatsActor extends Actor with ActorLogging {
       log.info("Top 3 Referrer : {}", sessionTopByAggr(3, (s: SessionStats) => s.requestsHistory.map(_.referrer)))
       log.info("View count for URLs : {}", globalCountByAggr((r: Request) => r.url))
       log.info("Browser Stats : {}", globalPctByAggr((r: Request) => r.browser))
+      context.become(handleStatusRequest)
+  }
+
+  private def handleStatusRequest: Receive = {
+    case NumberOfCompletedSessions => sender ! sessionStats.size
+    case NumberOfEventsProcessed => sender ! sessionStats.map(_.requestsHistory.size).sum
   }
 
   private def allRequest = sessionStats.flatMap(_.requestsHistory)

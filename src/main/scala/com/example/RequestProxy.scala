@@ -8,14 +8,17 @@ import akka.actor.Actor.Receive
   */
 class RequestProxy(statsActor: ActorRef) extends Actor with ActorLogging {
 
+  var completedSessionsCount = 0L
+  var eventsProcessedCount = 0L
   var userSessionActors = Map.empty[Long, ActorRef]
 
-  override def receive: Receive = handleMessages
+  override def receive: Receive = handleMessages orElse handleStatusRequest
 
   def handleMessages: Receive = {
     case r@Request(sessionId, timestamp, _, _, _) =>
+      eventsProcessedCount += 1
       val userSessionActor = userSessionActors.getOrElse(sessionId, {
-        log.info("New session detected with session id : {}", sessionId)
+        //log.info("New session detected with session id : {}", sessionId)
         val sessionActor = context.actorOf(SessionActor.props(statsActor))
         userSessionActors += (sessionId -> sessionActor)
         sessionActor
@@ -29,21 +32,29 @@ class RequestProxy(statsActor: ActorRef) extends Actor with ActorLogging {
       removeSessionActors(terminatedActor)
 
     case EOS =>
-      userSessionActors.values.foreach { _ forward EOS }
-      context.become(waitForTermination)
+      userSessionActors.values.foreach {
+        _ forward EOS
+      }
+      context.become(fileProcessingFinished orElse handleStatusRequest)
   }
 
-  def waitForTermination: Receive = {
+  def fileProcessingFinished: Receive = {
     case Terminated(terminatedActor) =>
       removeSessionActors(terminatedActor)
 
-      if(userSessionActors.isEmpty) {
+      if (userSessionActors.isEmpty) {
         statsActor forward EOS
-        context.stop(self)
       }
   }
 
+  private def handleStatusRequest: Receive = {
+    case NumberOfOpenSessions => sender ! userSessionActors.size
+    case NumberOfCompletedSessions => statsActor forward NumberOfCompletedSessions
+    case NumberOfEventsProcessed => statsActor forward NumberOfEventsProcessed
+  }
+
   private def removeSessionActors(terminatedActor: ActorRef): Unit = {
+    completedSessionsCount += 1
     // FIXME : Optimize find with BiMap
     userSessionActors
       .find { case ((_, ref)) => ref == terminatedActor }

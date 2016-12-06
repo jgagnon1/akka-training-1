@@ -74,8 +74,8 @@ class TerminalInterface(requestProxyActor: ActorRef, system: ActorSystem) {
 
 sealed trait StatusRequest
 
-object NumberOfOpenSessions extends StatusRequest
+case object NumberOfOpenSessions extends StatusRequest
 
-object NumberOfCompletedSessions extends StatusRequest
+case object NumberOfCompletedSessions extends StatusRequest
 
-object NumberOfEventsProcessed extends StatusRequest
+case object NumberOfEventsProcessed extends StatusRequest
