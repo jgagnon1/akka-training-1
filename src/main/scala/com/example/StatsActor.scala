@@ -2,8 +2,10 @@ package com.example
 
 import akka.actor.{Actor, ActorLogging, Props}
 import org.joda.time.format.DateTimeFormat
+import org.joda.time.DateTime
 
 import scala.collection.immutable.ListMap
+import scala.collection.mutable
 
 class StatsActor extends Actor with ActorLogging {
 
@@ -24,6 +26,8 @@ class StatsActor extends Actor with ActorLogging {
       log.info("Browser Stats : {}", globalPctByAggr((r: Request) => r.browser))
       log.info("Busiest minutes by Request Count: {}", globalCountByAggr((r: Request) =>
         DateTimeFormat.forPattern("YYYY-MM-dd HH:mm").print(r.timestamp)))
+      log.info("Average time per URLs in milliseconds: {}", avgTimePerURL)
+
       context.become(handleStatusRequest)
   }
 
@@ -54,6 +58,26 @@ class StatsActor extends Actor with ActorLogging {
       .toSeq.sortBy(-_._2)
 
     ListMap(results: _*)
+  }
+
+  private def avgTimePerURL = {
+    val urlMap = mutable.Map.empty[String, (Long, Long)]
+    sessionStats.map(s => s.requestsHistory).foreach {requests =>
+      requests.sliding(2).foreach {
+        case first :: second +: Nil =>
+          val url = first.url
+          val value = urlMap.getOrElse(url, (0L, 0L))
+          value match {
+            case (sum, count) =>
+              urlMap.update(first.url, (sum + (second.timestamp - first.timestamp), count + 1L))
+          }
+        case _ => //Noop
+      }
+    }
+    urlMap.map {
+      case (url, (sum, count)) =>
+        (url, sum / count.toFloat)
+    }
   }
 
 }
