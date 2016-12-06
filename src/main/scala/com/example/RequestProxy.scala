@@ -2,21 +2,21 @@ package com.example
 
 import akka.actor.{Actor, ActorLogging, ActorRef, Props, Terminated}
 import akka.actor.Actor.Receive
+import com.example.RequestProxy.LiveStats
 
 /**
   * Created by jerome on 2016-12-05.
   */
 class RequestProxy(statsActor: ActorRef) extends Actor with ActorLogging {
 
-  var completedSessionsCount = 0L
-  var eventsProcessedCount = 0L
   var userSessionActors = Map.empty[Long, ActorRef]
 
-  override def receive: Receive = handleMessages orElse handleStatusRequest
+  override def receive: Receive = liveProcessing(LiveStats.empty)
 
-  def handleMessages: Receive = {
+  def liveProcessing(liveStats: LiveStats): Receive = handleMessages(liveStats) orElse handleLiveStatusRequest(liveStats)
+
+  def handleMessages(liveStats: LiveStats): Receive = {
     case r@Request(sessionId, timestamp, _, _, _) =>
-      eventsProcessedCount += 1
       val userSessionActor = userSessionActors.getOrElse(sessionId, {
         //log.info("New session detected with session id : {}", sessionId)
         val sessionActor = context.actorOf(SessionActor.props(statsActor))
@@ -25,20 +25,25 @@ class RequestProxy(statsActor: ActorRef) extends Actor with ActorLogging {
       })
 
       context.watch(userSessionActor)
-
       userSessionActor forward r
+
+      // Update live stats
+      context.become(liveProcessing(liveStats.copy(eventProcessed = liveStats.eventProcessed + 1)))
 
     case Terminated(terminatedActor) =>
       removeSessionActors(terminatedActor)
+
+      // Update live stats
+      context.become(liveProcessing(liveStats.copy(completedSessions = liveStats.completedSessions + 1)))
 
     case EOS =>
       userSessionActors.values.foreach {
         _ forward EOS
       }
-      context.become(fileProcessingFinished orElse handleStatusRequest)
+      context.become(streamFinished orElse handleOfflineStatusRequest)
   }
 
-  def fileProcessingFinished: Receive = {
+  def streamFinished: Receive = {
     case Terminated(terminatedActor) =>
       removeSessionActors(terminatedActor)
 
@@ -47,14 +52,19 @@ class RequestProxy(statsActor: ActorRef) extends Actor with ActorLogging {
       }
   }
 
-  private def handleStatusRequest: Receive = {
+  private def handleLiveStatusRequest(liveStats: LiveStats): Receive = {
+    case NumberOfOpenSessions => sender ! userSessionActors.size
+    case NumberOfCompletedSessions => sender ! liveStats.completedSessions
+    case NumberOfEventsProcessed => sender ! liveStats.eventProcessed
+  }
+
+  private def handleOfflineStatusRequest: Receive = {
     case NumberOfOpenSessions => sender ! userSessionActors.size
     case NumberOfCompletedSessions => statsActor forward NumberOfCompletedSessions
     case NumberOfEventsProcessed => statsActor forward NumberOfEventsProcessed
   }
 
   private def removeSessionActors(terminatedActor: ActorRef): Unit = {
-    completedSessionsCount += 1
     // FIXME : Optimize find with BiMap
     userSessionActors
       .find { case ((_, ref)) => ref == terminatedActor }
@@ -69,6 +79,12 @@ class RequestProxy(statsActor: ActorRef) extends Actor with ActorLogging {
 object RequestProxy {
 
   def props(statsActor: ActorRef) = Props(classOf[RequestProxy], statsActor)
+
+  final case class LiveStats(completedSessions: Int, eventProcessed: Int)
+
+  object LiveStats {
+    def empty = LiveStats(0, 0)
+  }
 
 }
 
