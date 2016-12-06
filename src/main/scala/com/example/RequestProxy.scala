@@ -1,8 +1,9 @@
 package com.example
 
-import akka.actor.{Actor, ActorLogging, ActorRef, Props, Terminated}
-import akka.actor.Actor.Receive
+import akka.actor.{Actor, ActorLogging, ActorRef, OneForOneStrategy, Props, Terminated}
+import akka.actor.SupervisorStrategy.Stop
 import com.example.RequestProxy.LiveStats
+import com.example.SessionFilterActor.SessionRequestException
 
 /**
   * Created by jerome on 2016-12-05.
@@ -10,6 +11,10 @@ import com.example.RequestProxy.LiveStats
 class RequestProxy(statsActor: ActorRef) extends Actor with ActorLogging {
 
   var userSessionActors = Map.empty[Long, ActorRef]
+
+  override val supervisorStrategy = OneForOneStrategy() {
+    case _: SessionRequestException => Stop
+  }
 
   override def receive: Receive = liveProcessing(LiveStats.empty)
 
@@ -19,9 +24,9 @@ class RequestProxy(statsActor: ActorRef) extends Actor with ActorLogging {
     case r@Request(sessionId, _, _, _, _) =>
       val userSessionActor = userSessionActors.getOrElse(sessionId, {
         log.info("New session detected with session id : {}", sessionId)
-        val sessionActor = context.actorOf(SessionActor.props(sessionId, statsActor))
-        userSessionActors += (sessionId -> sessionActor)
-        sessionActor
+        val sessionFilterActor = context.actorOf(SessionFilterActor.props(sessionId, statsActor))
+        userSessionActors += (sessionId -> sessionFilterActor)
+        sessionFilterActor
       })
 
       context.watch(userSessionActor)

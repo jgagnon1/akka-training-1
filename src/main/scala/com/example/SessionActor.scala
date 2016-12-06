@@ -35,6 +35,10 @@ class SessionActor(sessionId: Long, statsActor: ActorRef) extends Actor with Act
       context.stop(self)
   }
 
+  override def postStop(): Unit = {
+    log.info(s"SessionActor has been stopped for {}", sessionId)
+  }
+
   private def sendStats() =
     statsActor ! SessionStats(sessionId, requestsHistory.reverse)
 

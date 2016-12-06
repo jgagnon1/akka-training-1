@@ -64,7 +64,7 @@ class StatsActor extends Actor with ActorLogging {
     val urlMap = mutable.Map.empty[String, (Long, Long)]
     sessionStats.map(s => s.requestsHistory).foreach {requests =>
       requests.sliding(2).foreach {
-        case first :: second +: Nil =>
+        case first +: second +: Nil =>
           val url = first.url
           val value = urlMap.getOrElse(url, (0L, 0L))
           value match {
