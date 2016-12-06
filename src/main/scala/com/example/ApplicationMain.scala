@@ -11,5 +11,5 @@ object ApplicationMain extends App {
 
   reader ! Read("resources/events-1k.txt")
 
-  system.awaitTermination()
+  new TerminalInterface(requestProxy, system).run()
 }
