@@ -1,39 +1,49 @@
 package com.example
 
-import akka.actor.Actor.Receive
-import akka.actor.{Actor, Props}
+import akka.actor.{Actor, ActorLogging, Props}
 
-class StatsActor extends Actor {
+class StatsActor extends Actor with ActorLogging {
 
   var sessionStats = Seq.empty[SessionStats]
 
   override def receive: Receive = {
     case stats: SessionStats =>
       sessionStats = stats +: sessionStats
-
     case EOS =>
-      summarize()
+      log.info("== STATS ==")
+      log.info("Top 2 Landing pages : {}", sessionTopByAggr(2, (s: SessionStats) => s.requestsHistory.headOption.map(_.url).toSeq))
+      log.info("Top 1 Sink page : {}", sessionTopByAggr(1, (s: SessionStats) => s.requestsHistory.lastOption.map(_.url).toSeq))
+      log.info("Top 3 Browser : {}", sessionTopByAggr(3, (s: SessionStats) => s.requestsHistory.map(_.browser)))
+      log.info("Top 3 Referrer : {}", sessionTopByAggr(3, (s: SessionStats) => s.requestsHistory.map(_.referrer)))
+      log.info("View count for URLs : {}", globalCountByAggr((r: Request) => r.url))
+      log.info("Browser Stats : {}", globalPctByAggr((r: Request) => r.browser))
   }
 
-  def summarize() = {
+  private def allRequest = sessionStats.flatMap(_.requestsHistory)
 
-    print(avgNumOfReqPerBrowserPerMinute)
-
+  private def sessionTopByAggr[T](n: Int, aggregateFn: SessionStats => Seq[T]) = {
+    sessionStats
+      .flatMap(aggregateFn(_))
+      .groupBy(identity)
+      .mapValues(_.size)
+      .toSeq.sortBy(-_._2).take(n).toMap
   }
 
-  def avgNumOfReqPerBrowserPerMinute: Map[String, Long] = {
-    val allRequests: Seq[Request] = sessionStats.map(_.requestsHistory).flatten
-    val browserToRequestTime: Map[String, Seq[Long]] = allRequests
-      .map(request => (request.browser, request.timestamp))
-      .groupBy(_._1)
-      .mapValues(all => all.map(_._2))
-
-    val browserToCountPerMin: Map[String, Long] = browserToRequestTime.mapValues(times => times.size / Math.max(1, ((times.max - times.min) / 1000 / 60)))
-    browserToCountPerMin
+  private def globalPctByAggr[T](aggregateFn: Request => T) = {
+    globalCountByAggr(aggregateFn)
+      .map { case (k, v) => (k, v / allRequest.size.toDouble) }
   }
 
+  private def globalCountByAggr[T](aggregateFn: Request => T) = {
+    allRequest
+      .groupBy(aggregateFn)
+      .map { case (k, v) => (k, v.size) }
+      .toSeq.sortBy(-_._2).toMap
+  }
 
 }
+
+case object PrintStats
 
 object StatsActor {
 
