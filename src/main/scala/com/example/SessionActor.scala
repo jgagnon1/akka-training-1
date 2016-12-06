@@ -8,10 +8,12 @@ class SessionActor(statsActor: ActorRef) extends Actor with ActorLogging {
 
   var requestsHistory = Seq.empty[Request]
 
+  context.setReceiveTimeout(5 seconds)
+
   override def receive: Receive = {
     case r: Request =>
       requestsHistory = r +: requestsHistory
-      context.setReceiveTimeout(5 seconds)
+
     case ReceiveTimeout =>
       log.debug("Receive timeout : End of session -> sending stats")
       sendStats()
