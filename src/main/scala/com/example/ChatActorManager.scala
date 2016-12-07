@@ -1,31 +1,53 @@
 package com.example
 
-import akka.actor.{Actor, Props, Stash, Terminated}
-import akka.actor.Actor.Receive
+import akka.actor.{Actor, FSM, Props, Stash, Terminated}
 
-class ChatActorManager extends Actor with Stash {
+import scala.collection.immutable.Queue
 
-  override def receive: Receive = idle
+class ChatActorManager extends Actor with FSM[ChatActorManager.State, ChatActorManager.Data] with Stash {
+  import ChatActorManager._
+  import ChatActorManager.State._
 
-  private def idle: Receive = {
-    case StartChat(sessionId) =>
-      context.become(busy)
-      val chatActor = context.actorOf(ChatActor.props(sessionId))
+  startWith(Idle, ChatQueue())
+
+  when(Idle) {
+    case Event(startChat: StartChat, chatQueue: ChatQueue) =>
+      val chatActor = context.actorOf(ChatActor.props(startChat.sessionId))
       context.watch(chatActor)
+      goto(Busy)
   }
 
-  private def busy: Receive = {
-    case StartChat(sessionId) =>
-      stash()
-    case Terminated(_) =>
-      context.become(idle)
-      unstashAll()
+  when(Busy) {
+    case Event(startChat: StartChat, chatQueue: ChatQueue) =>
+      stay using chatQueue.copy(chats = chatQueue.chats.enqueue(startChat))
+    case Event(Terminated(_), chatQueue: ChatQueue) =>
+      chatQueue.chats.dequeueOption match {
+        case Some((newChat, newChatQueue)) =>
+          self ! newChat
+          goto(Idle) using chatQueue.copy(chats = newChatQueue)
+        case None =>
+          goto(Idle)
+      }
   }
+
+  initialize()
 
 }
 
 object ChatActorManager {
   def props() = Props(classOf[ChatActorManager])
+
+  sealed trait State
+
+  object State {
+
+    case object Busy extends State
+
+    case object Idle extends State
+  }
+
+  sealed trait Data
+  final case class ChatQueue(chats: Queue[StartChat] = Queue.empty) extends Data
 }
 
 
