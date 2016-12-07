@@ -28,11 +28,11 @@ class SessionActor(sessionId: Long, statsActor: ActorRef) extends Actor with Act
     case ReceiveTimeout =>
       //log.debug("Receive timeout : End of session -> sending stats")
       sendStats()
-      context.stop(self)
+      //context.stop(self)
     case EOS =>
       log.info("EOS : End of session -> sending stats")
       sendStats()
-      context.stop(self)
+      //context.stop(self)
   }
 
   override def postStop(): Unit = {

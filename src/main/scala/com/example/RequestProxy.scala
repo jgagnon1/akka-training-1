@@ -23,7 +23,7 @@ class RequestProxy(statsActor: ActorRef) extends Actor with ActorLogging {
   def handleMessages(liveStats: LiveStats): Receive = {
     case r@Request(sessionId, _, _, _, _) =>
       val userSessionActor = userSessionActors.getOrElse(sessionId, {
-        log.info("New session detected with session id : {}", sessionId)
+        //log.info("New session detected with session id : {}", sessionId)
         val sessionFilterActor = context.actorOf(SessionFilterActor.props(sessionId, statsActor))
         userSessionActors += (sessionId -> sessionFilterActor)
         sessionFilterActor
@@ -74,7 +74,7 @@ class RequestProxy(statsActor: ActorRef) extends Actor with ActorLogging {
     userSessionActors
       .find { case ((_, ref)) => ref == terminatedActor }
       .foreach { case (sessionId, _) =>
-        log.info("End of session detected for session id: {}", sessionId)
+        //log.info("End of session detected for session id: {}", sessionId)
         userSessionActors -= sessionId
       }
   }

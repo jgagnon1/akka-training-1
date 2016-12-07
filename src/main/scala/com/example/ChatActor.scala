@@ -1,8 +1,12 @@
 package com.example
 
-import akka.actor.Actor.Receive
+import java.util.concurrent.Semaphore
+
 import akka.actor.{Actor, ActorLogging, Props}
-import Console._
+
+import scala.Console._
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.{Future, blocking}
 import scala.io.StdIn
 
 /**
@@ -11,14 +15,18 @@ import scala.io.StdIn
 class ChatActor(sessionId: Long) extends Actor with ActorLogging {
 
   override def preStart(): Unit = {
-    log.info(s"Starting chat session with <$sessionId>")
-    context.become(retrivingUsername)
-    self ! TryUser
+    Future {
+      blocking { ConsoleLock.acquire() }
+      context.become(retrivingUsername)
+      self ! TryUser
+    }
   }
 
-  override def receive: Receive = {
-    case i: UserInput =>
+  override def postStop(): Unit = {
+    ConsoleLock.release()
   }
+
+  override def receive: Receive = Actor.emptyBehavior
 
   private def retrivingUsername: Receive = {
     case TryUser =>
@@ -70,3 +78,15 @@ object ChatActor {
 final case class UserInput(message: String)
 
 object TryUser
+
+object ConsoleLock {
+  private val mutex = new Semaphore((1))
+
+  def acquire() = {
+    mutex.acquire()
+  }
+
+  def release() = {
+    mutex.release()
+  }
+}
