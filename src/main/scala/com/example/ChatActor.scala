@@ -1,12 +1,8 @@
 package com.example
 
-import java.util.concurrent.Semaphore
-
 import akka.actor.{Actor, ActorLogging, Props}
 
 import scala.Console._
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.{Future, blocking}
 import scala.io.StdIn
 
 /**
@@ -15,15 +11,8 @@ import scala.io.StdIn
 class ChatActor(sessionId: Long) extends Actor with ActorLogging {
 
   override def preStart(): Unit = {
-    Future {
-      blocking { ConsoleLock.acquire() }
-      context.become(retrivingUsername)
-      self ! TryUser
-    }
-  }
-
-  override def postStop(): Unit = {
-    ConsoleLock.release()
+    context.become(retrivingUsername)
+    self ! TryUser
   }
 
   override def receive: Receive = Actor.emptyBehavior
@@ -79,14 +68,3 @@ final case class UserInput(message: String)
 
 object TryUser
 
-object ConsoleLock {
-  private val mutex = new Semaphore((1))
-
-  def acquire() = {
-    mutex.acquire()
-  }
-
-  def release() = {
-    mutex.release()
-  }
-}

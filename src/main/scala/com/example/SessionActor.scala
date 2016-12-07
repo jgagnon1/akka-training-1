@@ -4,7 +4,7 @@ import akka.actor.{Actor, ActorLogging, ActorRef, Props, ReceiveTimeout}
 
 import scala.concurrent.duration._
 
-class SessionActor(sessionId: Long, statsActor: ActorRef) extends Actor with ActorLogging {
+class SessionActor(sessionId: Long, statsActor: ActorRef, chatActorManager: ActorRef) extends Actor with ActorLogging {
 
   var requestsHistory = Seq.empty[Request]
 
@@ -23,7 +23,7 @@ class SessionActor(sessionId: Long, statsActor: ActorRef) extends Actor with Act
           resetState()
       }
     case ReceiveTimeout if onHelp =>
-      val chatActor = context.actorOf(ChatActor.props(sessionId))
+      chatActorManager ! StartChat(sessionId)
       resetState()
     case ReceiveTimeout =>
       //log.debug("Receive timeout : End of session -> sending stats")
@@ -51,7 +51,7 @@ class SessionActor(sessionId: Long, statsActor: ActorRef) extends Actor with Act
 
 object SessionActor {
 
-  def props(sessionId: Long, statsActor: ActorRef): Props = Props(classOf[SessionActor], sessionId, statsActor)
+  def props(sessionId: Long, statsActor: ActorRef, chatActorManager: ActorRef): Props = Props(classOf[SessionActor], sessionId, statsActor, chatActorManager)
 
 }
 

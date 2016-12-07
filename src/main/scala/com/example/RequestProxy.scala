@@ -8,7 +8,7 @@ import com.example.SessionFilterActor.SessionRequestException
 /**
   * Created by jerome on 2016-12-05.
   */
-class RequestProxy(statsActor: ActorRef) extends Actor with ActorLogging {
+class RequestProxy(statsActor: ActorRef, chatActorManager: ActorRef) extends Actor with ActorLogging {
 
   var userSessionActors = Map.empty[Long, ActorRef]
 
@@ -83,7 +83,7 @@ class RequestProxy(statsActor: ActorRef) extends Actor with ActorLogging {
 
 object RequestProxy {
 
-  def props(statsActor: ActorRef) = Props(classOf[RequestProxy], statsActor)
+  def props(statsActor: ActorRef, chatActorManager: ActorRef) = Props(classOf[RequestProxy], statsActor, chatActorManager)
 
   final case class LiveStats(completedSessions: Int, eventProcessed: Int)
 
