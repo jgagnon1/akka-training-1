@@ -24,7 +24,7 @@ class RequestProxy(statsActor: ActorRef, chatActorManager: ActorRef) extends Act
     case r@Request(sessionId, _, _, _, _) =>
       val userSessionActor = userSessionActors.getOrElse(sessionId, {
         //log.info("New session detected with session id : {}", sessionId)
-        val sessionFilterActor = context.actorOf(SessionFilterActor.props(sessionId, statsActor))
+        val sessionFilterActor = context.actorOf(SessionFilterActor.props(sessionId, statsActor, chatActorManager))
         userSessionActors += (sessionId -> sessionFilterActor)
         sessionFilterActor
       })

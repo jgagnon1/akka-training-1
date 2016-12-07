@@ -4,7 +4,7 @@ import akka.actor.{Actor, ActorLogging, ActorRef, Cancellable, Props}
 
 import scala.concurrent.duration._
 
-class SessionFilterActor(sessionId: Long, statsActor: ActorRef) extends Actor with ActorLogging {
+class SessionFilterActor(sessionId: Long, statsActor: ActorRef, chatActorManager: ActorRef) extends Actor with ActorLogging {
   import com.example.SessionFilterActor._
   import context.dispatcher
 
@@ -16,7 +16,7 @@ class SessionFilterActor(sessionId: Long, statsActor: ActorRef) extends Actor wi
     CheckRequestFrequency
   )
 
-  val sessionActor = context.actorOf(SessionActor.props(sessionId, statsActor))
+  val sessionActor = context.actorOf(SessionActor.props(sessionId, statsActor, chatActorManager))
 
   override def receive: Receive = {
     case r: Request =>
@@ -53,7 +53,7 @@ class SessionFilterActor(sessionId: Long, statsActor: ActorRef) extends Actor wi
 
 object SessionFilterActor {
 
-  def props(sessionId: Long, statsActor: ActorRef): Props = Props(classOf[SessionFilterActor], sessionId, statsActor)
+  def props(sessionId: Long, statsActor: ActorRef, chatActorManager: ActorRef): Props = Props(classOf[SessionFilterActor], sessionId, statsActor, chatActorManager)
 
   val RateLimit = 15
 
